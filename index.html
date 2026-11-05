@@ -1,0 +1,385 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <title>Relic</title>
+  <meta name="description" content="Relic — 大学生のための過去問・レポート管理エディタ">
+  <meta name="theme-color" content="#12C2D4">
+  <link rel="icon" type="image/svg+xml" href="Relic_icon.svg">
+  <link rel="apple-touch-icon" href="Relic_icon.svg">
+
+  <!-- テーマのちらつき防止（ライト/ダーク） -->
+  <script>
+    (function () {
+      try {
+        var pref = localStorage.getItem('relic-theme') || 'system';
+        var dark = pref === 'dark' || (pref === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
+        document.documentElement.setAttribute('data-theme', dark ? 'dark' : 'light');
+      } catch (e) { document.documentElement.setAttribute('data-theme', 'light'); }
+    })();
+  </script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+JP:wght@400;700&family=Noto+Serif+JP:wght@400;700&display=swap">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.2/css/all.min.css">
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.css">
+  <link rel="stylesheet" href="css/doc.css">
+  <link rel="stylesheet" href="css/style.css">
+
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/KaTeX/0.16.9/katex.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/mathlive@0.98.6/dist/mathlive.min.js"></script>
+  <script type="module" src="js/app.js"></script>
+</head>
+<body>
+
+  <!-- ===== 起動中 ===== -->
+  <div id="loading" class="loading-screen">
+    <div class="brand-mark big"><img src="Relic_icon.svg" alt="" class="brand-img" data-fallback><i class="fa-solid fa-book-bookmark brand-fallback"></i></div>
+    <div class="loading-name">Relic</div>
+    <div class="spinner"></div>
+  </div>
+
+  <!-- ===== ログイン ===== -->
+  <section id="login" class="login-screen" hidden>
+    <form id="loginForm" class="login-card" autocomplete="on">
+      <div class="login-brand">
+        <div class="brand-mark big"><img src="Relic_icon.svg" alt="" class="brand-img" data-fallback><i class="fa-solid fa-book-bookmark brand-fallback"></i></div>
+        <h1>Relic</h1>
+        <p class="sub">過去問・レポートをひとつに。</p>
+      </div>
+      <div class="login-switch" role="tablist">
+        <button type="button" class="active" data-mode="signin">ログイン</button>
+        <button type="button" data-mode="signup">新規登録</button>
+      </div>
+      <label class="field">
+        <span><i class="fa-solid fa-envelope"></i> メールアドレス</span>
+        <input type="email" id="loginEmail" required autocomplete="email" placeholder="you@example.com">
+      </label>
+      <label class="field">
+        <span><i class="fa-solid fa-lock"></i> パスワード</span>
+        <input type="password" id="loginPassword" required minlength="6" autocomplete="current-password" placeholder="6文字以上">
+      </label>
+      <p id="loginError" class="form-error" hidden></p>
+      <button type="submit" class="btn primary block" id="loginSubmit"><i class="fa-solid fa-right-to-bracket"></i> <span>ログイン</span></button>
+      <div class="or"><span>または</span></div>
+      <button type="button" class="btn block" id="googleLogin"><i class="fa-brands fa-google"></i> Google でログイン</button>
+      <button type="button" class="link-btn" id="resetPassword">パスワードをお忘れですか？</button>
+    </form>
+  </section>
+
+  <!-- ===== アプリ本体 ===== -->
+  <div id="app" class="app" hidden>
+    <header class="app-header">
+      <div class="brand">
+        <div class="brand-mark"><img src="Relic_icon.svg" alt="" class="brand-img" data-fallback><i class="fa-solid fa-book-bookmark brand-fallback"></i></div>
+        <span class="brand-name">Relic</span>
+      </div>
+      <div class="quick edit-only">
+        <button class="hbtn" data-action="save" title="上書き保存 (Ctrl+S)"><i class="fa-solid fa-floppy-disk"></i></button>
+        <button class="hbtn" data-action="undo" title="元に戻す (Ctrl+Z)"><i class="fa-solid fa-rotate-left"></i></button>
+        <button class="hbtn" data-action="redo" title="やり直し (Ctrl+Y)"><i class="fa-solid fa-rotate-right"></i></button>
+      </div>
+      <div class="doc-title">
+        <button id="docTitle" class="doc-title-btn" title="名前を変更">無題のドキュメント</button>
+        <span id="saveState" class="save-state"></span>
+      </div>
+      <div class="header-right">
+        <button class="hbtn" id="themeToggle" title="ライト/ダーク切り替え"><i class="fa-solid fa-moon"></i></button>
+        <button class="hbtn account-btn" id="accountBtn" title="アカウント"><i class="fa-solid fa-circle-user"></i></button>
+      </div>
+    </header>
+
+    <nav class="tabbar" role="tablist">
+      <button class="tab tab-file" data-tab="file" role="tab"><i class="fa-solid fa-folder-open"></i><span>ファイル</span></button>
+      <button class="tab edit-only" data-tab="home" role="tab">ホーム</button>
+      <button class="tab edit-only" data-tab="math" role="tab">数式</button>
+      <button class="tab edit-only" data-tab="layout" role="tab">レイアウト</button>
+      <button class="tab" data-tab="view" role="tab">表示</button>
+    </nav>
+
+    <!-- ===== リボン ===== -->
+    <div id="ribbon" class="ribbon">
+
+      <!-- ホーム -->
+      <div class="ribbon-panel" data-panel="home">
+        <div class="rgroup">
+          <div class="rgroup-body">
+            <div class="rrow">
+              <select id="fontFamily" class="rselect font-select" data-cmd="fontFamily" title="フォント"></select>
+              <input id="fontSize" class="rselect size-input" data-cmd="fontSize" list="fontSizes" value="10.5" title="フォントサイズ (pt)" inputmode="decimal">
+              <datalist id="fontSizes"></datalist>
+              <button class="rbtn" data-cmd="growFont" title="フォントサイズの拡大"><i class="fa-solid fa-font"></i><sup class="mini">+</sup></button>
+              <button class="rbtn" data-cmd="shrinkFont" title="フォントサイズの縮小"><i class="fa-solid fa-font small-ic"></i><sup class="mini">−</sup></button>
+              <button class="rbtn" data-cmd="clearFormat" title="書式のクリア"><i class="fa-solid fa-text-slash"></i></button>
+            </div>
+            <div class="rrow">
+              <button class="rbtn" data-cmd="exec" data-arg="bold" data-state="bold" title="太字 (Ctrl+B)"><i class="fa-solid fa-bold"></i></button>
+              <button class="rbtn" data-cmd="exec" data-arg="italic" data-state="italic" title="斜体 (Ctrl+I)"><i class="fa-solid fa-italic"></i></button>
+              <button class="rbtn" data-cmd="exec" data-arg="underline" data-state="underline" title="下線 (Ctrl+U)"><i class="fa-solid fa-underline"></i></button>
+              <button class="rbtn" data-cmd="exec" data-arg="strikeThrough" data-state="strikeThrough" title="取り消し線"><i class="fa-solid fa-strikethrough"></i></button>
+              <span class="rsep"></span>
+              <button class="rbtn" data-cmd="exec" data-arg="superscript" data-state="superscript" title="上付き（指数）"><i class="fa-solid fa-superscript"></i></button>
+              <button class="rbtn" data-cmd="exec" data-arg="subscript" data-state="subscript" title="下付き（添え字）"><i class="fa-solid fa-subscript"></i></button>
+              <span class="rsep"></span>
+              <span class="split">
+                <button class="rbtn" data-cmd="foreColor" title="フォントの色"><span class="ic-color"><i class="fa-solid fa-font"></i><span class="cbar" id="barForeColor" style="background:#000000"></span></span></button>
+                <button class="rbtn caret" data-color="foreColor" title="フォントの色を選択"><i class="fa-solid fa-caret-down"></i></button>
+              </span>
+              <span class="split">
+                <button class="rbtn" data-cmd="hiliteColor" title="蛍光ペン"><span class="ic-color"><i class="fa-solid fa-highlighter"></i><span class="cbar" id="barHiliteColor" style="background:#ffff00"></span></span></button>
+                <button class="rbtn caret" data-color="hiliteColor" title="蛍光ペンの色を選択"><i class="fa-solid fa-caret-down"></i></button>
+              </span>
+              <button class="rbtn" data-dd="ddEnclose" title="囲み文字"><span class="enc-ic">字</span><i class="fa-solid fa-caret-down tiny"></i></button>
+              <button class="rbtn" data-cmd="ruby" title="フリガナ（ルビ）"><span class="ruby-ic"><small>あ</small>亜</span></button>
+            </div>
+          </div>
+          <div class="rgroup-label">フォント</div>
+        </div>
+
+        <div class="rgroup">
+          <div class="rgroup-body">
+            <div class="rrow">
+              <button class="rbtn" data-cmd="exec" data-arg="insertUnorderedList" data-state="insertUnorderedList" title="箇条書き"><i class="fa-solid fa-list-ul"></i></button>
+              <button class="rbtn" data-cmd="exec" data-arg="insertOrderedList" data-state="insertOrderedList" title="段落番号"><i class="fa-solid fa-list-ol"></i></button>
+              <button class="rbtn" data-cmd="outline" title="アウトライン（1. / 1.1 / 1.1.1）"><i class="fa-solid fa-list-check"></i></button>
+              <button class="rbtn" data-cmd="exec" data-arg="outdent" title="インデントを減らす"><i class="fa-solid fa-outdent"></i></button>
+              <button class="rbtn" data-cmd="exec" data-arg="indent" title="インデントを増やす"><i class="fa-solid fa-indent"></i></button>
+              <span class="rsep"></span>
+              <button class="rbtn" data-dd="ddLineHeight" title="行間"><i class="fa-solid fa-text-height"></i><i class="fa-solid fa-caret-down tiny"></i></button>
+            </div>
+            <div class="rrow">
+              <button class="rbtn" data-cmd="align" data-arg="left" data-state="justifyLeft" title="左揃え"><i class="fa-solid fa-align-left"></i></button>
+              <button class="rbtn" data-cmd="align" data-arg="center" data-state="justifyCenter" title="中央揃え"><i class="fa-solid fa-align-center"></i></button>
+              <button class="rbtn" data-cmd="align" data-arg="right" data-state="justifyRight" title="右揃え"><i class="fa-solid fa-align-right"></i></button>
+              <button class="rbtn" data-cmd="align" data-arg="justify" data-state="justifyFull" title="両端揃え"><i class="fa-solid fa-align-justify"></i></button>
+              <span class="rsep"></span>
+              <button class="rbtn" data-dd="ddHScale" title="文字の拡大縮小（横方向）"><i class="fa-solid fa-text-width"></i><i class="fa-solid fa-caret-down tiny"></i></button>
+              <button class="rbtn" data-dd="ddLine" title="線を引く"><i class="fa-solid fa-grip-lines"></i><i class="fa-solid fa-caret-down tiny"></i></button>
+              <span class="split">
+                <button class="rbtn" data-cmd="boxColor" title="ボックスの色"><span class="ic-color"><i class="fa-solid fa-fill-drip"></i><span class="cbar" id="barBoxColor" style="background:#e3f8fa"></span></span></button>
+                <button class="rbtn caret" data-color="boxColor" title="ボックスの色を選択"><i class="fa-solid fa-caret-down"></i></button>
+              </span>
+            </div>
+          </div>
+          <div class="rgroup-label">段落</div>
+        </div>
+
+        <div class="rgroup">
+          <div class="rgroup-body row-big">
+            <button class="rbtn big" data-cmd="insert" data-arg="text" title="テキストボックスを挿入"><i class="fa-solid fa-font"></i><span>テキスト</span></button>
+            <button class="rbtn big" data-cmd="insert" data-arg="math" title="数式ボックスを挿入"><i class="fa-solid fa-square-root-variable"></i><span>数式</span></button>
+            <button class="rbtn big" data-cmd="insert" data-arg="image" title="図表（画像）ボックスを挿入"><i class="fa-solid fa-image"></i><span>図表</span></button>
+          </div>
+          <div class="rgroup-label">挿入</div>
+        </div>
+
+        <div class="rgroup">
+          <div class="rgroup-body">
+            <button class="rbtn wide" data-cmd="find" title="検索 (Ctrl+F)"><i class="fa-solid fa-magnifying-glass"></i><span>検索</span></button>
+            <button class="rbtn wide" data-cmd="replace" title="置換 (Ctrl+H)"><i class="fa-solid fa-right-left"></i><span>置換</span></button>
+          </div>
+          <div class="rgroup-label">編集</div>
+        </div>
+      </div>
+
+      <!-- 数式 -->
+      <div class="ribbon-panel" data-panel="math" hidden>
+        <div class="rgroup">
+          <div class="rgroup-body row-big">
+            <button class="rbtn big" data-cmd="insert" data-arg="math" title="数式ボックスを挿入"><i class="fa-solid fa-square-root-variable"></i><span>数式ボックス</span></button>
+            <button class="rbtn big" data-cmd="mathKeyboard" title="数式キーボード"><i class="fa-solid fa-keyboard"></i><span>キーボード</span></button>
+            <button class="rbtn big" data-cmd="latexEdit" title="LaTeX で直接編集"><i class="fa-solid fa-code"></i><span>LaTeX</span></button>
+          </div>
+          <div class="rgroup-label">数式</div>
+        </div>
+        <div class="rgroup">
+          <div class="rgroup-body math-grid" id="mathStructures"></div>
+          <div class="rgroup-label">構造</div>
+        </div>
+        <div class="rgroup">
+          <div class="rgroup-body math-grid symbols" id="mathSymbols"></div>
+          <div class="rgroup-label">記号</div>
+        </div>
+        <div class="rgroup">
+          <div class="rgroup-body math-grid symbols" id="mathGreek"></div>
+          <div class="rgroup-label">ギリシャ文字</div>
+        </div>
+      </div>
+
+      <!-- レイアウト -->
+      <div class="ribbon-panel" data-panel="layout" hidden>
+        <div class="rgroup">
+          <div class="rgroup-body row-big">
+            <button class="rbtn big" data-dd="ddMargin" title="余白"><i class="fa-solid fa-border-none"></i><span>余白 <i class="fa-solid fa-caret-down tiny"></i></span></button>
+            <button class="rbtn big" data-dd="ddOrient" title="印刷の向き"><i class="fa-solid fa-rotate"></i><span>向き <i class="fa-solid fa-caret-down tiny"></i></span></button>
+            <button class="rbtn big" data-dd="ddSize" title="サイズ"><i class="fa-regular fa-file"></i><span>サイズ <i class="fa-solid fa-caret-down tiny"></i></span></button>
+          </div>
+          <div class="rgroup-label">ページ設定</div>
+        </div>
+        <div class="rgroup">
+          <div class="rgroup-body row-big">
+            <button class="rbtn big" data-cmd="addPage" title="ページを追加"><i class="fa-solid fa-file-circle-plus"></i><span>ページ追加</span></button>
+            <button class="rbtn big" data-cmd="deletePage" title="表示中のページを削除"><i class="fa-solid fa-file-circle-minus"></i><span>ページ削除</span></button>
+          </div>
+          <div class="rgroup-label">ページ</div>
+        </div>
+        <div class="rgroup">
+          <div class="rgroup-body">
+            <div class="layout-info" id="layoutInfo"></div>
+          </div>
+          <div class="rgroup-label">現在の設定</div>
+        </div>
+      </div>
+
+      <!-- 表示 -->
+      <div class="ribbon-panel" data-panel="view" hidden>
+        <div class="rgroup">
+          <div class="rgroup-body">
+            <div class="rrow">
+              <button class="rbtn" data-cmd="zoomOut" title="縮小"><i class="fa-solid fa-magnifying-glass-minus"></i></button>
+              <span class="zoom-label" id="zoomLabel">100%</span>
+              <button class="rbtn" data-cmd="zoomIn" title="拡大"><i class="fa-solid fa-magnifying-glass-plus"></i></button>
+            </div>
+            <div class="rrow">
+              <button class="rbtn wide" data-cmd="zoomReset" title="100%"><i class="fa-solid fa-1"></i><span>100%</span></button>
+              <button class="rbtn wide" data-cmd="zoomFit" title="ページ幅に合わせる"><i class="fa-solid fa-arrows-left-right-to-line"></i><span>ページ幅</span></button>
+            </div>
+          </div>
+          <div class="rgroup-label">ズーム</div>
+        </div>
+        <div class="rgroup edit-only">
+          <div class="rgroup-body">
+            <button class="rbtn wide" data-cmd="toggleGuides" id="btnGuides" title="余白ガイド"><i class="fa-solid fa-vector-square"></i><span>余白ガイド</span></button>
+            <button class="rbtn wide" data-cmd="toggleGrid" id="btnGrid" title="グリッド線"><i class="fa-solid fa-table-cells"></i><span>グリッド線</span></button>
+          </div>
+          <div class="rgroup-label">表示</div>
+        </div>
+        <div class="rgroup">
+          <div class="rgroup-body row-big">
+            <button class="rbtn big" data-cmd="theme" data-arg="light" title="ライトモード"><i class="fa-solid fa-sun"></i><span>ライト</span></button>
+            <button class="rbtn big" data-cmd="theme" data-arg="dark" title="ダークモード"><i class="fa-solid fa-moon"></i><span>ダーク</span></button>
+            <button class="rbtn big" data-cmd="theme" data-arg="system" title="システム設定に従う"><i class="fa-solid fa-desktop"></i><span>システム</span></button>
+          </div>
+          <div class="rgroup-label">テーマ</div>
+        </div>
+      </div>
+
+      <!-- ドロップダウン -->
+      <div class="dd-menu" id="ddEnclose">
+        <div class="dd-label">囲み文字（8文字以内）</div>
+        <button class="dd-item" data-cmd="enclose" data-arg="circle"><i class="fa-regular fa-circle"></i>丸</button>
+        <button class="dd-item" data-cmd="enclose" data-arg="square"><i class="fa-regular fa-square"></i>四角</button>
+        <button class="dd-item" data-cmd="enclose" data-arg="triangle"><i class="fa-solid fa-play fa-rotate-270 outline-ic"></i>三角</button>
+        <button class="dd-item" data-cmd="enclose" data-arg="diamond"><i class="fa-regular fa-gem"></i>ひし形</button>
+        <div class="dd-hint">右クリックで縁の色・太さを設定</div>
+      </div>
+      <div class="dd-menu" id="ddLineHeight">
+        <div class="dd-label">相対値（フォントサイズに比例）</div>
+        <button class="dd-item" data-cmd="lineHeight" data-arg="1">1.0</button>
+        <button class="dd-item" data-cmd="lineHeight" data-arg="1.15">1.15</button>
+        <button class="dd-item" data-cmd="lineHeight" data-arg="1.5">1.5</button>
+        <button class="dd-item" data-cmd="lineHeight" data-arg="2">2.0</button>
+        <button class="dd-item" data-cmd="lineHeight" data-arg="2.5">2.5</button>
+        <button class="dd-item" data-cmd="lineHeight" data-arg="3">3.0</button>
+        <button class="dd-item" data-cmd="lineHeightCustom" data-arg="rel"><i class="fa-solid fa-sliders"></i>相対値を指定…</button>
+        <div class="dd-sep"></div>
+        <div class="dd-label">固定値（フォントサイズに依存しない）</div>
+        <button class="dd-item" data-cmd="lineHeightCustom" data-arg="pt"><i class="fa-solid fa-ruler-vertical"></i>固定値 (pt) を指定…</button>
+      </div>
+      <div class="dd-menu" id="ddHScale">
+        <div class="dd-label">文字の拡大縮小（横方向）</div>
+        <button class="dd-item" data-cmd="hscale" data-arg="2">200%</button>
+        <button class="dd-item" data-cmd="hscale" data-arg="1.5">150%</button>
+        <button class="dd-item" data-cmd="hscale" data-arg="1.2">120%</button>
+        <button class="dd-item" data-cmd="hscale" data-arg="1"><b>100%</b></button>
+        <button class="dd-item" data-cmd="hscale" data-arg="0.9">90%</button>
+        <button class="dd-item" data-cmd="hscale" data-arg="0.8">80%</button>
+        <button class="dd-item" data-cmd="hscale" data-arg="0.7">70%</button>
+        <button class="dd-item" data-cmd="hscale" data-arg="0.6">60%</button>
+        <button class="dd-item" data-cmd="hscale" data-arg="0.5">50%</button>
+        <button class="dd-item" data-cmd="hscale" data-arg="0.3">30%</button>
+      </div>
+      <div class="dd-menu" id="ddLine">
+        <div class="dd-label">テキストに線を引く</div>
+        <button class="dd-item" data-cmd="hr" data-arg="solid"><span class="line-sample solid"></span>実線</button>
+        <button class="dd-item" data-cmd="hr" data-arg="dashed"><span class="line-sample dashed"></span>破線</button>
+        <button class="dd-item" data-cmd="hr" data-arg="dotted"><span class="line-sample dotted"></span>点線</button>
+        <button class="dd-item" data-cmd="hr" data-arg="double"><span class="line-sample double"></span>二重線</button>
+        <div class="dd-sep"></div>
+        <div class="dd-label">ボックスの枠線</div>
+        <button class="dd-item" data-cmd="boxBorder" data-arg="solid"><i class="fa-regular fa-square"></i>実線</button>
+        <button class="dd-item" data-cmd="boxBorder" data-arg="dashed"><i class="fa-solid fa-border-none"></i>破線</button>
+        <button class="dd-item" data-cmd="boxBorder" data-arg="none"><i class="fa-solid fa-ban"></i>なし</button>
+      </div>
+      <div class="dd-menu" id="ddMargin">
+        <button class="dd-item two" data-cmd="margin" data-arg="35,30,30,30"><b>標準</b><small>上 35 / 下 30 / 左 30 / 右 30 mm</small></button>
+        <button class="dd-item two" data-cmd="margin" data-arg="12.7,12.7,12.7,12.7"><b>狭い</b><small>上下左右 12.7 mm</small></button>
+        <button class="dd-item two" data-cmd="margin" data-arg="25.4,25.4,19.05,19.05"><b>やや狭い</b><small>上下 25.4 / 左右 19.05 mm</small></button>
+        <button class="dd-item two" data-cmd="margin" data-arg="25.4,25.4,50.8,50.8"><b>広い</b><small>上下 25.4 / 左右 50.8 mm</small></button>
+        <div class="dd-sep"></div>
+        <button class="dd-item" data-cmd="marginCustom"><i class="fa-solid fa-sliders"></i>ユーザー設定の余白…</button>
+      </div>
+      <div class="dd-menu" id="ddOrient">
+        <button class="dd-item" data-cmd="orientation" data-arg="portrait"><i class="fa-regular fa-file"></i>縦</button>
+        <button class="dd-item" data-cmd="orientation" data-arg="landscape"><i class="fa-regular fa-file fa-rotate-90"></i>横</button>
+      </div>
+      <div class="dd-menu" id="ddSize">
+        <button class="dd-item two" data-cmd="paper" data-arg="A3"><b>A3</b><small>297 × 420 mm</small></button>
+        <button class="dd-item two" data-cmd="paper" data-arg="A4"><b>A4</b><small>210 × 297 mm</small></button>
+        <button class="dd-item two" data-cmd="paper" data-arg="A5"><b>A5</b><small>148 × 210 mm</small></button>
+        <button class="dd-item two" data-cmd="paper" data-arg="B4"><b>B4</b><small>257 × 364 mm</small></button>
+        <button class="dd-item two" data-cmd="paper" data-arg="B5"><b>B5</b><small>182 × 257 mm</small></button>
+      </div>
+    </div>
+
+    <!-- ===== 編集画面 ===== -->
+    <main id="editorView" class="work">
+      <div id="scroller" class="scroller">
+        <div id="pages" class="pages"></div>
+      </div>
+      <div id="findPanel" class="find-panel" hidden>
+        <div class="find-row">
+          <i class="fa-solid fa-magnifying-glass"></i>
+          <input id="findInput" type="search" placeholder="検索" autocomplete="off">
+          <span id="findCount" class="find-count">0/0</span>
+          <button class="icon-btn" id="findPrev" title="前へ"><i class="fa-solid fa-chevron-up"></i></button>
+          <button class="icon-btn" id="findNext" title="次へ"><i class="fa-solid fa-chevron-down"></i></button>
+          <button class="icon-btn" id="findClose" title="閉じる"><i class="fa-solid fa-xmark"></i></button>
+        </div>
+        <div class="find-row" id="replaceRow">
+          <i class="fa-solid fa-right-left"></i>
+          <input id="replaceInput" type="text" placeholder="置換後の文字列" autocomplete="off">
+          <button class="btn small" id="replaceOne">置換</button>
+          <button class="btn small" id="replaceAll">すべて置換</button>
+        </div>
+        <label class="find-opt"><input type="checkbox" id="findCase"> 大文字と小文字を区別</label>
+      </div>
+    </main>
+
+    <!-- ===== ファイル（ストレージ） ===== -->
+    <div id="fileView" class="file-view" hidden>
+      <aside class="file-sidebar">
+        <button class="fs-item fs-back edit-only" data-fs="back" title="編集画面に戻る"><i class="fa-solid fa-circle-arrow-left"></i><span>戻る</span></button>
+        <button class="fs-item edit-only" data-fs="new"><i class="fa-regular fa-file"></i><span>新規</span></button>
+        <button class="fs-item" data-fs="open"><i class="fa-regular fa-folder-open"></i><span>開く</span></button>
+        <button class="fs-item edit-only" data-fs="saveas"><i class="fa-solid fa-file-pen"></i><span>名前を付けて保存</span></button>
+        <button class="fs-item edit-only" data-fs="save"><i class="fa-solid fa-floppy-disk"></i><span>上書き保存</span></button>
+        <button class="fs-item edit-only" data-fs="copy"><i class="fa-regular fa-copy"></i><span>コピーを作成</span></button>
+        <button class="fs-item" data-fs="export"><i class="fa-solid fa-file-export"></i><span>出力</span></button>
+        <div class="fs-spacer"></div>
+        <button class="fs-item" data-fs="settings"><i class="fa-solid fa-gear"></i><span>設定</span></button>
+      </aside>
+      <section class="file-main" id="fileMain"></section>
+    </div>
+  </div>
+
+  <div id="toasts" class="toasts" aria-live="polite"></div>
+  <input type="file" id="imageInput" accept="image/*" hidden>
+  <input type="file" id="htmlInput" accept=".html,.htm,text/html" hidden>
+</body>
+</html>

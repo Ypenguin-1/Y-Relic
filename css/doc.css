@@ -1,0 +1,98 @@
+/* =========================================================
+   Relic — ドキュメント本体のスタイル
+   編集画面・PDF/画像出力・HTML出力で共通に使用します。
+   用紙は常に白（ダークモードでも印刷結果と同じ見た目）。
+   ========================================================= */
+
+.page {
+  position: relative;
+  background: #ffffff;
+  color: #000000;
+  box-sizing: border-box;
+  overflow: visible;
+}
+.page.static { overflow: hidden; }
+
+.box {
+  position: absolute;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+}
+.box-body {
+  position: relative;
+  flex: 1 1 auto;
+  width: 100%;
+  min-height: 0;
+  box-sizing: border-box;
+}
+
+/* ---- テキスト ---- */
+.tb-content {
+  min-height: 100%;
+  box-sizing: border-box;
+  padding: 1mm 1.5mm;
+  outline: none;
+  color: #000000;
+  font-family: "MS Mincho", "ＭＳ 明朝", "Hiragino Mincho ProN", "Yu Mincho", "Noto Serif JP", serif;
+  font-size: 10.5pt;
+  line-height: 1.5;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  text-align: left;
+}
+.tb-content p { margin: 0; }
+.tb-content ul, .tb-content ol { margin: 0; padding-left: 1.8em; }
+.tb-content blockquote { margin: 0 0 0 2em; }
+
+/* 指数：行の 1/2 程度のサイズで上半分 / 添え字：下半分 */
+.tb-content sup { font-size: 0.5em; vertical-align: 0.95em; line-height: 0; }
+.tb-content sub { font-size: 0.5em; vertical-align: -0.3em; line-height: 0; }
+
+/* アウトライン（1. / 1.1 / 1.1.1） */
+.tb-content ol.outline, .tb-content ol.outline ol { list-style: none; counter-reset: rl-item; padding-left: 1.6em; }
+.tb-content ol.outline li { counter-increment: rl-item; }
+.tb-content ol.outline li::before { content: counters(rl-item, ".") ". "; margin-left: -1.6em; display: inline-block; min-width: 1.6em; }
+.tb-content ol.outline ol li::before { content: counters(rl-item, ".") " "; }
+
+/* 線を引く */
+.tb-content hr.rl-line { border: none; border-top: 1px solid #000; margin: 0.4em 0; height: 0; }
+
+/* 文字の拡大縮小（横方向） */
+.tb-content .hscale { display: inline-block; transform-origin: left center; white-space: pre; text-indent: 0; }
+
+/* 囲み文字 */
+.enc {
+  display: inline-block;
+  position: relative;
+  line-height: 1;
+  vertical-align: middle;
+  white-space: nowrap;
+  text-indent: 0;
+  margin: 0 0.08em;
+}
+.enc-t { position: relative; z-index: 1; display: inline-block; line-height: 1; }
+.enc-s { position: absolute; left: 0; top: 0; overflow: visible; pointer-events: none; z-index: 0; }
+
+/* フリガナ */
+.tb-content ruby rt { font-size: 0.5em; }
+
+/* ---- 数式 ---- */
+.math-view {
+  padding: 1mm 1.5mm;
+  color: #000;
+  font-size: 11pt;
+  overflow: hidden;
+  min-height: 100%;
+  box-sizing: border-box;
+}
+.math-view .katex-display { margin: 0; text-align: inherit; }
+.math-view .katex-display > .katex { text-align: inherit; }
+.math-view .katex { font-size: 1.15em; }
+.math-empty { color: #9aa5b1; font-style: italic; font-size: 10pt; }
+.static .math-empty { visibility: hidden; }
+.math-fallback { font-family: "Times New Roman", serif; font-style: italic; }
+
+/* ---- 画像 ---- */
+.box-image .box-body { overflow: hidden; }
+.box-image img { display: block; width: 100%; height: 100%; object-fit: fill; user-select: none; -webkit-user-drag: none; }
