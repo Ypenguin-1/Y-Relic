@@ -368,7 +368,6 @@ function renderExport(main) {
    ========================================================= */
 function renderSettings(main) {
   const theme = ctx.getThemePref();
-  const user = ctx.user();
   main.innerHTML = `
     <h1 class="fm-title"><i class="fa-solid fa-gear"></i>設定</h1>
     <div class="card">
@@ -381,18 +380,10 @@ function renderSettings(main) {
       <p class="hint">用紙は印刷結果と同じく常に白で表示されます。</p>
     </div>
     <div class="card">
-      <h3><i class="fa-solid fa-circle-user"></i>アカウント</h3>
-      <div class="form-grid">
-        <label>ログイン中</label><div>${esc(user?.email || user?.displayName || '-')}</div>
-      </div>
-      <div class="actions"><button class="btn danger" id="setLogout"><i class="fa-solid fa-right-from-bracket"></i>ログアウト</button></div>
-    </div>
-    <div class="card">
       <h3><i class="fa-solid fa-circle-info"></i>Relic について</h3>
       <p class="hint" style="margin:0">Relic v1.0 — 過去問・レポートをひとつに。</p>
     </div>`;
   main.querySelectorAll('input[name=theme]').forEach((r) => r.addEventListener('change', () => ctx.setTheme(r.value)));
-  $('#setLogout').addEventListener('click', () => ctx.logout());
 }
 
 function fail(e) {
