@@ -1,4 +1,8 @@
 // Relic — アプリ本体
+import {
+  auth, onAuthStateChanged, signInWithEmailAndPassword, createUserWithEmailAndPassword, signOut,
+  GoogleAuthProvider, signInWithPopup, sendPasswordResetEmail, authErrorMessage,
+} from './firebase.js';
 import { $, $$, toast, openDialog, promptDialog, showContextMenu, bindBrandFallback, esc } from './ui.js';
 import * as st from './storage.js';
 import * as ed from './editor.js';
@@ -13,6 +17,7 @@ import { newDoc } from './docmodel.js';
    状態
    ========================================================= */
 const cur = { fileId: null, name: '無題のドキュメント', parentId: st.ROOT, dirty: false, saving: false };
+let user = null;
 let tab = 'file';
 let readonly = false;
 const phoneMQ = window.matchMedia('(max-width: 599px)');
@@ -33,7 +38,7 @@ function applyTheme() {
 function setTheme(pref) {
   try { localStorage.setItem('relic-theme', pref); } catch { /* ignore */ }
   applyTheme();
-  st.saveSettings({ theme: pref });
+  if (user) st.saveSettings({ theme: pref });
   if (tab === 'file') filetab.render();
 }
 darkMQ.addEventListener?.('change', applyTheme);
@@ -209,19 +214,68 @@ function applyReadonly() {
 }
 
 /* =========================================================
-   起動処理（ログインなし：起動時はストレージを開く）
+   ログイン
    ========================================================= */
-async function start() {
-  try { await st.refresh(); } catch (e) { console.error(e); toast('ストレージを読み込めませんでした：' + (e?.message || ''), 'error', 5000); }
-  $('#loading').hidden = true;
+let loginMode = 'signin';
+function initLogin() {
+  $$('.login-switch button').forEach((b) => b.addEventListener('click', () => {
+    loginMode = b.dataset.mode;
+    $$('.login-switch button').forEach((x) => x.classList.toggle('active', x === b));
+    $('#loginSubmit span').textContent = loginMode === 'signin' ? 'ログイン' : 'アカウントを作成';
+    $('#loginSubmit i').className = loginMode === 'signin' ? 'fa-solid fa-right-to-bracket' : 'fa-solid fa-user-plus';
+    $('#loginPassword').autocomplete = loginMode === 'signin' ? 'current-password' : 'new-password';
+    $('#loginError').hidden = true;
+  }));
+  const showErr = (e) => { const el = $('#loginError'); el.textContent = authErrorMessage(e); el.hidden = false; };
+  $('#loginForm').addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const email = $('#loginEmail').value.trim();
+    const pw = $('#loginPassword').value;
+    const btn = $('#loginSubmit');
+    btn.disabled = true;
+    try {
+      if (loginMode === 'signin') await signInWithEmailAndPassword(auth, email, pw);
+      else await createUserWithEmailAndPassword(auth, email, pw);
+    } catch (err) { showErr(err); } finally { btn.disabled = false; }
+  });
+  $('#googleLogin').addEventListener('click', async () => {
+    try { await signInWithPopup(auth, new GoogleAuthProvider()); } catch (err) { showErr(err); }
+  });
+  $('#resetPassword').addEventListener('click', async () => {
+    const email = $('#loginEmail').value.trim() || await promptDialog('パスワードの再設定', '登録したメールアドレス', '', { type: 'email' });
+    if (!email) return;
+    try { await sendPasswordResetEmail(auth, email); toast('再設定用のメールを送信しました', 'success'); } catch (err) { showErr(err); }
+  });
+}
+
+async function logout() {
+  if (!(await confirmDiscard())) return;
+  cur.dirty = false;
+  await signOut(auth);
+}
+
+async function onSignedIn(u) {
+  user = u;
+  st.setUser(u);
+  $('#login').hidden = true;
   $('#app').hidden = false;
+  try { await st.refresh(); } catch (e) { console.error(e); toast('ストレージを読み込めませんでした：' + (e?.message || ''), 'error', 5000); }
   const settings = await st.loadSettings();
   if (settings.theme && settings.theme !== getThemePref()) { try { localStorage.setItem('relic-theme', settings.theme); } catch { /* ignore */ } applyTheme(); }
+  Object.assign(cur, { fileId: null, name: '無題のドキュメント', parentId: st.ROOT, dirty: false });
   ed.loadDoc(newDoc());
   updateTitle();
   applyReadonly();
+  // 起動時はストレージ（ファイル）を開く
   switchTab('file');
   filetab.show('open');
+}
+
+function onSignedOut() {
+  user = null;
+  st.setUser(null);
+  $('#app').hidden = true;
+  $('#login').hidden = false;
 }
 
 /* =========================================================
@@ -230,6 +284,7 @@ async function start() {
 function init() {
   bindBrandFallback();
   applyTheme();
+  initLogin();
 
   ed.initEditor($('#scroller'), $('#pages'), {
     onDirty: () => setDirty(true),
@@ -244,7 +299,8 @@ function init() {
     isReadonly: () => readonly,
     pageCount: () => ed.pageCount(),
     getDoc: () => ed.getDoc(),
-    showEditor, newDocument, openFile, save, saveAs, makeCopy, importHTML, setTheme, getThemePref,
+    showEditor, newDocument, openFile, save, saveAs, makeCopy, importHTML, logout, setTheme, getThemePref,
+    user: () => user,
     setName: (n) => { cur.name = n; updateTitle(); },
     detach: () => { cur.fileId = null; setDirty(true); },
   });
@@ -265,6 +321,15 @@ function init() {
       if (b.dataset.action === 'redo') ed.redo();
     });
   });
+  $('#accountBtn').addEventListener('click', (e) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    showContextMenu(r.right - 220, r.bottom + 6, [
+      { icon: 'fa-solid fa-circle-user', label: user?.email || 'アカウント', disabled: true, action: () => {} },
+      '-',
+      { icon: 'fa-solid fa-gear', label: '設定', action: () => { switchTab('file'); filetab.show('settings'); } },
+      { icon: 'fa-solid fa-right-from-bracket', label: 'ログアウト', danger: true, action: logout },
+    ]);
+  });
 
   // ショートカット
   document.addEventListener('keydown', (e) => {
@@ -278,11 +343,14 @@ function init() {
     else if (k === 'p' && tab !== 'file') { e.preventDefault(); switchTab('file'); filetab.show('export'); }
   });
 
-  window.addEventListener('beforeunload', (e) => { if (cur.dirty) { e.preventDefault(); e.returnValue = ''; } });
-  phoneMQ.addEventListener?.('change', applyReadonly);
+  window.addEventListener('beforeunload', (e) => { if (cur.dirty && user) { e.preventDefault(); e.returnValue = ''; } });
+  phoneMQ.addEventListener?.('change', () => { if (user) applyReadonly(); });
   window.addEventListener('resize', () => { if (readonly) ed.zoomFit(); });
 
-  start();
+  onAuthStateChanged(auth, (u) => {
+    $('#loading').hidden = true;
+    if (u) onSignedIn(u); else onSignedOut();
+  });
 }
 
 init();

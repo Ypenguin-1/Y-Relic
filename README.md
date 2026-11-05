@@ -5,7 +5,7 @@ Word を簡単にしたような編集画面（Note 風のボックス配置）�
 
 - メインカラー `#12C2D4` / ライト・ダークモード対応
 - PC・タブレットは編集可、スマホ（幅 599px 以下）は閲覧のみ
-- データは Firebase Realtime Database に保存（個人利用のためログイン機能なし）
+- アカウント・データは Firebase（Authentication + Realtime Database）で管理
 - ビルド不要（HTML / CSS / ES Modules）。ライブラリは CDN から読み込み
   - Font Awesome 6（無料）/ KaTeX（数式表示）/ MathLive（数式入力）/ html2canvas + jsPDF + JSZip（出力）
 
@@ -16,7 +16,7 @@ index.html            画面（ログイン・タブ・リボン・編集画面�
 Relic_icon.svg        アプリアイコン（未配置の場合は代替アイコンを表示）
 css/style.css         アプリ UI・テーマ・メディアクエリ
 css/doc.css           ドキュメント本体のスタイル（編集・出力共通）
-js/app.js             起動・タブ切替・保存処理
+js/app.js             起動・認証・タブ切替・保存処理
 js/firebase.js        Firebase 設定
 js/storage.js         ストレージ（フォルダー/ファイル）の読み書き
 js/editor.js          編集画面（ページ・ボックスの追加/移動/リサイズ・数式・画像・履歴）
@@ -25,18 +25,17 @@ js/ribbon.js          リボン（ホーム/数式/レイアウト/表示）
 js/filetab.js         「ファイル」タブ（開く/名前を付けて保存/出力/設定）
 js/export.js          PDF・画像・HTML 出力、HTML 読み込み
 js/find.js            検索・置換
-database.rules.json   Realtime Database のルール（relic/ 以下を読み書き可）
+database.rules.json   Realtime Database のセキュリティルール（本人のデータのみ読み書き可）
 ```
 
-データは `relic/nodes`（フォルダー/ファイル一覧）、`relic/docs`（本文）、`relic/settings` に保存されます。どの端末から開いても同じストレージが表示されます。
+データは `users/{uid}/nodes`（フォルダー/ファイル一覧）、`users/{uid}/docs`（本文）、`users/{uid}/settings` に保存されます。
 
 ## セットアップ（Firebase コンソール）
 
-1. **Realtime Database** → ルールに `database.rules.json` の内容を設定
+1. **Authentication** → ログイン方法で「メール/パスワード」と「Google」を有効化
+2. **Authentication** → 設定 → 承認済みドメインに公開先のドメインを追加（`localhost` は既定で登録済み）
+3. **Realtime Database** → ルールに `database.rules.json` の内容を設定
    （または `firebase deploy --only database`）
-
-> ⚠ ログインが無いため、データベースの URL を知っている人は誰でもデータを読み書きできます。
-> 公開 URL を他人に共有しないでください。
 
 ## 起動
 

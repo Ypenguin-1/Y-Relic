@@ -44,6 +44,34 @@
     <div class="spinner"></div>
   </div>
 
+  <!-- ===== ログイン ===== -->
+  <section id="login" class="login-screen" hidden>
+    <form id="loginForm" class="login-card" autocomplete="on">
+      <div class="login-brand">
+        <div class="brand-mark big"><img src="Relic_icon.svg" alt="" class="brand-img" data-fallback><i class="fa-solid fa-book-bookmark brand-fallback"></i></div>
+        <h1>Relic</h1>
+        <p class="sub">過去問・レポートをひとつに。</p>
+      </div>
+      <div class="login-switch" role="tablist">
+        <button type="button" class="active" data-mode="signin">ログイン</button>
+        <button type="button" data-mode="signup">新規登録</button>
+      </div>
+      <label class="field">
+        <span><i class="fa-solid fa-envelope"></i> メールアドレス</span>
+        <input type="email" id="loginEmail" required autocomplete="email" placeholder="you@example.com">
+      </label>
+      <label class="field">
+        <span><i class="fa-solid fa-lock"></i> パスワード</span>
+        <input type="password" id="loginPassword" required minlength="6" autocomplete="current-password" placeholder="6文字以上">
+      </label>
+      <p id="loginError" class="form-error" hidden></p>
+      <button type="submit" class="btn primary block" id="loginSubmit"><i class="fa-solid fa-right-to-bracket"></i> <span>ログイン</span></button>
+      <div class="or"><span>または</span></div>
+      <button type="button" class="btn block" id="googleLogin"><i class="fa-brands fa-google"></i> Google でログイン</button>
+      <button type="button" class="link-btn" id="resetPassword">パスワードをお忘れですか？</button>
+    </form>
+  </section>
+
   <!-- ===== アプリ本体 ===== -->
   <div id="app" class="app" hidden>
     <header class="app-header">
@@ -62,6 +90,7 @@
       </div>
       <div class="header-right">
         <button class="hbtn" id="themeToggle" title="ライト/ダーク切り替え"><i class="fa-solid fa-moon"></i></button>
+        <button class="hbtn account-btn" id="accountBtn" title="アカウント"><i class="fa-solid fa-circle-user"></i></button>
       </div>
     </header>
 

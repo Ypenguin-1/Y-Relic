@@ -1,13 +1,15 @@
 // ストレージ：Firebase Realtime Database にフォルダー/ファイルを保存
-// relic/nodes/{id} : { name, type: 'folder'|'file', parentId, createdAt, updatedAt }
-// relic/docs/{id}  : ドキュメント本体
-// relic/settings   : 設定
-// ※ 個人利用のためログインは無く、固定のパスに保存します。
+// users/{uid}/nodes/{id} : { name, type: 'folder'|'file', parentId, createdAt, updatedAt }
+// users/{uid}/docs/{id}  : ドキュメント本体
+// users/{uid}/settings   : 設定
 import { db, ref, get, update, push } from './firebase.js';
 
 export const ROOT = 'root';
+let uid = null;
 let nodes = {};
-const base = () => 'relic';
+
+export function setUser(u) { uid = u?.uid || null; nodes = {}; }
+const base = () => { if (!uid) throw new Error('not signed in'); return `users/${uid}`; };
 
 export async function refresh() {
   const snap = await get(ref(db, `${base()}/nodes`));
